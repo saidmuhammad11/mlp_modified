@@ -1,0 +1,4 @@
+Starting STREAM-like memory-intensive workload...
+C:\Users\saidm\Desktop\Programming\Hardware_test\memory_intensive.py:27: RuntimeWarning: overflow encountered in multiply
+  A[:] = B + 3.0 * C
+STREAM-like workload done.

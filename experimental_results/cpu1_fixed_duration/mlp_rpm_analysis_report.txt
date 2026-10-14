@@ -1,0 +1,40 @@
+
+MLP-RPM Performance Analysis Report (Multi-Run Averaged)
+=========================================================
+Generated: 2026-10-14 11:08:19
+Workload: CPU_Intensive
+Type: CPU_INTENSIVE
+Average Duration: 298.9 seconds
+Processed Runs: 5 baseline runs, 5 MLP-RPM runs
+
+WORKLOAD CHARACTERIZATION
+-------------------------
+This is a cpu-intensive workload:
+- High L3 miss rate and memory bandwidth → CPU stalls on memory
+- Frequency scaling has limited impact on IPC
+- Ideal strategy: Moderate frequency to save energy without hurting performance
+
+EXECUTIVE SUMMARY
+-----------------
+- Energy Savings: +9.7% ✅
+- IPC Change: -5.9% ❌
+- L3 Miss Rate Reduction: +6.4% ✅
+
+KEY METRICS (Averaged across runs)
+----------------------------------
+Default Windows Medium:
+  Avg Power:     6.66 W
+  Avg IPC:       1.463
+  L3 Miss Rate:  0.351
+
+MLP-RPM:
+  Avg Power:     6.00 W
+  Avg IPC:       1.376
+  L3 Miss Rate:  0.329
+
+MLP-RPM Level Distribution (Concatenated):
+  Low: 1510 samples (100.0%)
+
+CONCLUSION
+----------
+❌ The MLP-RPM controller does not provide clear benefits under this workload.

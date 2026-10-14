@@ -1,0 +1,9 @@
+Metric,default DVFS,With SW-DVFS,Improvement,Improvement %
+Avg CPU Power (W),44.854,44.337,-0.517,+1.2%
+Avg IPC,1.228,1.228,+0.001,+0.1%
+Avg CPU Usage (%),13.957,16.061,+2.103,-15.1%
+Avg L2 Miss Rate,0.037,0.038,+0.001,-2.0%
+Avg L3 Miss Rate,0.040,0.037,-0.003,+6.8%
+Avg Temp (°C),66.862,67.512,+0.650,-1.0%
+Avg Freq (GHz),2.722,2.779,+0.057,+2.1%
+Total Energy (J),12648.944,11837.968,-810.976,+6.4%

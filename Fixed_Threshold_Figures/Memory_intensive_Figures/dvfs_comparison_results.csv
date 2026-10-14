@@ -1,0 +1,9 @@
+Metric,default DVFS,Fixed PMC-thresholds,Improvement,Improvement %
+Avg CPU Power (W),47.528,43.490,-4.038,+8.5%
+Avg IPC,1.340,1.265,-0.075,-5.6%
+Avg CPU Usage (%),21.676,19.356,-2.319,+10.7%
+Avg L2 Miss Rate,0.047,0.042,-0.006,+12.2%
+Avg L3 Miss Rate,0.039,0.040,+0.001,-1.6%
+Avg Temp (°C),67.033,66.971,-0.063,+0.1%
+Avg Freq (GHz),2.597,2.647,+0.050,+1.9%
+Total Energy (J),12832.500,11611.800,-1220.700,+9.5%

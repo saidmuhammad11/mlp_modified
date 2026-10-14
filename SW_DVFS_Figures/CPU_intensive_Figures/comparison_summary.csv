@@ -1,0 +1,7 @@
+Metric,Baseline (No DVFS),SW-DVFS Adaptive
+Avg Power (W),47.24,45.01
+Max Power (W),64.78,64.28
+Avg IPC,1.322,1.241
+Avg Frequency (GHz),2.81,2.76
+Total Energy (J),14173,13504
+Energy Savings (%),,4.7

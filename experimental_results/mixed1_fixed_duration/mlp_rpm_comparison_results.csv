@@ -1,0 +1,7 @@
+Metric,Default Windows Medium,MLP-RPM,Improvement,Improvement %
+Avg CPU Power (W),9.990,7.930,-2.060,+20.6%
+Avg IPC,1.279,1.300,+0.022,+1.7%
+Avg CPU Usage (%),16.140,19.088,+2.949,-18.3%
+Avg L2 Miss Rate,0.409,0.424,+0.016,-3.8%
+Avg L3 Miss Rate,0.287,0.267,-0.020,+6.9%
+Total Energy (J),1313.013,1106.902,-206.111,+15.7%

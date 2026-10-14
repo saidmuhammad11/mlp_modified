@@ -1,0 +1,27 @@
+{
+  "experiment_timestamp": "2026-10-12T15:32:42.268195",
+  "controller": "mlp",
+  "workload": "C:\\Users\\saidm\\Desktop\\Programming\\Hardware_test\\cpu_intensive.py",
+  "threads": 3,
+  "run_mode": "duration",
+  "requested_duration_s": 300.0,
+  "duration_policy": "repeat",
+  "benchmark_start": "2026-10-12T15:27:39.824551",
+  "benchmark_end": "2026-10-12T15:32:42.268195",
+  "benchmark_duration_s": 300.0,
+  "exit_reason": "duration_reached",
+  "samples": 89,
+  "cpu_package_energy_j": 2162.9292870299996,
+  "avg_cpu_power_w": 7.209764290099999,
+  "avg_ipc": 1.1809499730816664,
+  "avg_cpu_frequency_mhz": 0.609899240365,
+  "avg_cpu_usage_percent": 19.646726075083333,
+  "total_instructions_retired": 2894400000.0,
+  "total_cpu_cycles": 4824000000.0,
+  "edp_j_s": 648878.7861089999,
+  "ed2p_j_s2": 194663635.83269995,
+  "power_plan_switches": 2,
+  "state_decision_counts": {
+    "Low": 89
+  }
+}
