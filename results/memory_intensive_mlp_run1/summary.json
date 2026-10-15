@@ -1,0 +1,27 @@
+{
+  "experiment_timestamp": "2026-10-13T10:57:33.388784",
+  "controller": "mlp",
+  "workload": "C:\\Users\\saidm\\Desktop\\Programming\\Hardware_test\\memory_intensive.py",
+  "threads": 3,
+  "run_mode": "completion",
+  "requested_duration_s": null,
+  "duration_policy": null,
+  "benchmark_start": "2026-10-13T10:55:30.099458",
+  "benchmark_end": "2026-10-13T10:57:33.372688",
+  "benchmark_duration_s": 123.28162299998803,
+  "exit_reason": "benchmark_completed",
+  "samples": 58,
+  "cpu_package_energy_j": 1326.832575690883,
+  "avg_cpu_power_w": 10.762614438414815,
+  "avg_ipc": 0.70381868530803,
+  "avg_cpu_frequency_mhz": 2.0564995374817547,
+  "avg_cpu_usage_percent": 17.239057761107432,
+  "total_instructions_retired": 8565440000.0,
+  "total_cpu_cycles": 12064000000.0,
+  "edp_j_s": 163574.07338042653,
+  "ed2p_j_s2": 20165677.247058123,
+  "power_plan_switches": 2,
+  "state_decision_counts": {
+    "Low": 58
+  }
+}

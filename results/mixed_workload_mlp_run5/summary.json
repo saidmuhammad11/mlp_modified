@@ -1,0 +1,27 @@
+{
+  "experiment_timestamp": "2026-10-13T11:32:20.588623",
+  "controller": "mlp",
+  "workload": "C:\\Users\\saidm\\Desktop\\Programming\\Hardware_test\\mixed_workload.py",
+  "threads": 3,
+  "run_mode": "completion",
+  "requested_duration_s": null,
+  "duration_policy": null,
+  "benchmark_start": "2026-10-13T11:30:15.066786",
+  "benchmark_end": "2026-10-13T11:32:20.585880",
+  "benchmark_duration_s": 125.5187300999969,
+  "exit_reason": "benchmark_completed",
+  "samples": 60,
+  "cpu_package_energy_j": 1540.0816277265076,
+  "avg_cpu_power_w": 12.269735572528276,
+  "avg_ipc": 1.2746510718442317,
+  "avg_cpu_frequency_mhz": 2.469689046595094,
+  "avg_cpu_usage_percent": 17.608468564605104,
+  "total_instructions_retired": 13752959999.999998,
+  "total_cpu_cycles": 12064000000.0,
+  "edp_j_s": 193309.09016256742,
+  "ed2p_j_s2": 24263911.513991266,
+  "power_plan_switches": 2,
+  "state_decision_counts": {
+    "Low": 60
+  }
+}

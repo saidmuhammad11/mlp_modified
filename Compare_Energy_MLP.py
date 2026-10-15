@@ -2,9 +2,14 @@
 """
 MLP-RPM energy/performance comparison and publication-ready plots.
 
-Updated to support multi-run averaging across baseline and proposed experimental results.
-All secondary figures follow the clearer journal template.
-Secondary plots remove CPU frequency and temperature to focus on primary performance metrics.
+Updated for multi-run averaging (N-runs) and Work-Normalized / Task-to-Completion metrics:
+- Task Execution Time (s)
+- Total Instructions Retired (count)
+- Total CPU Cycles (count)
+- Total Memory Data Transferred (GB)
+- Instructions Per Joule (IPJ - Computational Energy Efficiency)
+- Energy-Delay Product (EDP = E * T)
+- Energy-Delay Squared (ED^2P = E * T^2)
 """
 
 import json
@@ -16,7 +21,6 @@ import os
 from collections import Counter
 
 # =================== CONFIGURATION ===================
-# Provide lists of JSON log files for multiple experiment runs.
 BASELINE_FILES = [
     './results/memory_intensive_medium_run1/monitoring.jsonl',
     './results/memory_intensive_medium_run2/monitoring.jsonl',
@@ -33,39 +37,31 @@ PROPOSED_FILES = [
     './results/memory_intensive_mlp_run5/monitoring.jsonl',
 ]
 
-
-# Every run gets its own timestamped results folder so previous experiments are preserved.
 RESULTS_ROOT = 'experimental_results'
 RUN_ID = datetime.now().strftime('%Y%m%d_%H%M%S')
 RESULTS_DIR = os.path.join(RESULTS_ROOT, f'mlp_rpm_{RUN_ID}')
 
-# Figure filename stems. Each figure is saved as BOTH JPEG and PDF.
+# Output files
 OUTPUT_PLOT_COMPREHENSIVE = 'mlp_rpm_comprehensive_analysis'
 OUTPUT_PLOT_BOX = 'mlp_rpm_box_plots'
 OUTPUT_PLOT_LEVELS = 'mlp_rpm_performance_levels'
 OUTPUT_PLOT_CACHE = 'mlp_rpm_cache_performance'
 OUTPUT_TABLE_FIGURE = 'mlp_rpm_comparison_table'
 
-# Non-image outputs are saved in the same experiment folder.
 OUTPUT_TABLE_CSV = os.path.join(RESULTS_DIR, 'mlp_rpm_comparison_results.csv')
 OUTPUT_REPORT = os.path.join(RESULTS_DIR, 'mlp_rpm_analysis_report.txt')
 
 SAMPLING_INTERVAL_SEC = 3
-PLOT_DURATION_SEC = 300.0  # Fallback duration (5 min)
-
-# Analysis time grid settings
 ANALYSIS_DURATION_S = 300.0  # Dynamically updated in main based on max run duration
 COMMON_GRID_STEP_S = 1.0
-STRICT_DURATION_CHECK = False  # Allows runs with slightly varying completion times
+STRICT_DURATION_CHECK = False
 ENDPOINT_TOLERANCE_MULTIPLIER = 1.5
 MIN_ENDPOINT_TOLERANCE_S = 3.0
-WORKLOAD_NAME = "CPU_Intensive"
+WORKLOAD_NAME = "memory_intensive"
 
-# Figure/report labels used throughout the script.
 BASELINE_LABEL = "Default Windows Medium"
 PROPOSED_LABEL = "MLP-RPM"
 
-# Final printed width used by the aligned manuscript template.
 FULL_WIDTH_IN = 7.16
 BASE_FONT_SIZE = 10.5
 PANEL_LABEL_SIZE = BASE_FONT_SIZE
@@ -74,7 +70,6 @@ AUX_LABEL_SIZE = 11.2
 AUX_TICK_SIZE = 10.2
 AUX_LEGEND_SIZE = 10.5
 
-# Journal-template typography for secondary figures.
 LEVEL_LABEL_SIZE = 11.2
 LEVEL_TICK_SIZE = 10.2
 LEVEL_TITLE_SIZE = 11.2
@@ -86,9 +81,8 @@ SUMMARY_TICK_SIZE = 10.8
 SUMMARY_LEGEND_SIZE = 11.8
 SUMMARY_PANEL_SIZE = 11.8
 
-# Colors
-COLOR_WITH_DVFS = '#FF69B4'      # Pink: MLP-RPM
-COLOR_default_DVFS = '#4169E1'   # Blue: Default Windows Medium
+COLOR_WITH_DVFS = '#FF69B4'
+COLOR_default_DVFS = '#4169E1'
 
 STATE_STYLES = {
     'Low': {'color': '#4C78A8', 'hatch': '///'},
@@ -107,10 +101,8 @@ POLICY_STYLES = {
     PROPOSED_LABEL: {'hatch': 'xx'},
 }
 
-# Memory bandwidth threshold
-MAX_MEMORY_BANDWIDTH = 50.0  # GB/s
+MAX_MEMORY_BANDWIDTH = 50.0
 
-# =================== PUBLICATION FIGURE STYLE ===================
 plt.rcParams.update({
     'font.family': 'sans-serif',
     'font.size': BASE_FONT_SIZE,
@@ -137,13 +129,11 @@ plt.rcParams.update({
 
 
 def ensure_results_dir():
-    """Create the output directory for this experimental run."""
     os.makedirs(RESULTS_DIR, exist_ok=True)
     return RESULTS_DIR
 
 
 def save_figure_jpeg_pdf(fig, filename_stem, *, bbox_inches='tight', pad_inches=None):
-    """Save one Matplotlib figure as both a 300-dpi JPEG and a vector PDF."""
     ensure_results_dir()
     jpeg_path = os.path.join(RESULTS_DIR, f'{filename_stem}.jpg')
     pdf_path = os.path.join(RESULTS_DIR, f'{filename_stem}.pdf')
@@ -158,7 +148,6 @@ def save_figure_jpeg_pdf(fig, filename_stem, *, bbox_inches='tight', pad_inches=
 
 
 def add_panel_label(ax, label):
-    """Place a publication-style panel label at the upper-left."""
     ax.text(
         -0.12, 1.03, label, transform=ax.transAxes,
         fontsize=PANEL_LABEL_SIZE, fontweight='bold',
@@ -167,7 +156,6 @@ def add_panel_label(ax, label):
 
 
 def align_ylabels_by_column(fig, axes, left_x=-0.17, right_x=-0.16):
-    """Align y-axis labels vertically within each subplot column."""
     axes = np.asarray(axes, dtype=object)
     for row in range(axes.shape[0]):
         for col in range(axes.shape[1]):
@@ -178,7 +166,6 @@ def align_ylabels_by_column(fig, axes, left_x=-0.17, right_x=-0.16):
 
 
 def load_json_log(filename):
-    """Load and parse JSON log file into DataFrame with elapsed seconds."""
     if not os.path.exists(filename):
         print(f"Warning: File not found, skipping: {filename}")
         return pd.DataFrame()
@@ -206,14 +193,12 @@ def load_json_log(filename):
 
 
 def trapezoid(y, x):
-    """Trapezoidal integration with compatibility across NumPy versions."""
     if hasattr(np, 'trapezoid'):
         return float(np.trapezoid(y, x))
     return float(np.trapz(y, x))
 
 
 def compute_energy(df, power_col, fallback_dt=SAMPLING_INTERVAL_SEC):
-    """Compute total energy in Joules using recorded timestamps when available."""
     if df.empty or power_col not in df.columns:
         return np.nan
 
@@ -227,7 +212,6 @@ def compute_energy(df, power_col, fallback_dt=SAMPLING_INTERVAL_SEC):
 
 
 def estimate_sampling_interval_s(df):
-    """Estimate median positive telemetry interval in seconds."""
     elapsed = df['elapsed_s'].to_numpy(dtype=float)
     differences = np.diff(elapsed)
     positive = differences[np.isfinite(differences) & (differences > 0.0)]
@@ -237,7 +221,6 @@ def estimate_sampling_interval_s(df):
 
 
 def endpoint_tolerance_s(df):
-    """Maximum small endpoint gap permitted for run duration."""
     median_interval = estimate_sampling_interval_s(df)
     if not np.isfinite(median_interval):
         return MIN_ENDPOINT_TOLERANCE_S
@@ -248,13 +231,11 @@ def endpoint_tolerance_s(df):
 
 
 def build_common_time_grid(duration_s):
-    """Return the fixed uniform journal-analysis grid in seconds."""
     points = int(round(duration_s / COMMON_GRID_STEP_S))
     return np.linspace(0.0, duration_s, points + 1)
 
 
 def numeric_metric_samples(df, column):
-    """Return finite, timestamp-sorted numeric samples for one metric."""
     if column not in df.columns:
         raise KeyError(f"Missing metric column: {column}")
 
@@ -275,7 +256,6 @@ def numeric_metric_samples(df, column):
 
 
 def interpolate_numeric_metric(df, column, time_grid_s, label):
-    """Interpolate a metric onto the common 0..T s analysis grid."""
     sample_time_s, sample_values = numeric_metric_samples(df, column)
     tolerance = endpoint_tolerance_s(df)
     first_time = float(sample_time_s[0])
@@ -293,7 +273,6 @@ def interpolate_numeric_metric(df, column, time_grid_s, label):
 
 
 def align_categorical_state(df, time_grid_s):
-    """Align controller states by last-observation carry-forward."""
     if 'dvfs_level' not in df.columns:
         return np.full(time_grid_s.shape, 'Fixed', dtype=object)
 
@@ -314,7 +293,6 @@ def align_categorical_state(df, time_grid_s):
 
 
 def summarize_aligned_metric(time_s, baseline_values, proposed_values):
-    """Return time-weighted means and baseline-referenced difference."""
     duration_s = float(time_s[-1] - time_s[0])
     if duration_s <= 0.0:
         raise ValueError('Aligned analysis duration must be positive')
@@ -353,7 +331,6 @@ class RobustDVFSComparator:
         self.workload_type = self.detect_workload_type()
 
     def detect_workload_type(self):
-        """Detect if workload is CPU or memory intensive across runs."""
         avg_l3_miss = (
             self.metric_statistics('l3_miss_rate')['proposed_mean']
             if 'l3_miss_rate' in self.proposeds[0].columns else 0.0
@@ -368,7 +345,6 @@ class RobustDVFSComparator:
         return "cpu_intensive"
 
     def aligned_metric(self, column):
-        """Return cached baseline/proposed arrays averaged on the common grid."""
         if column not in self._aligned_cache:
             base_arrays = [
                 interpolate_numeric_metric(df, column, self.analysis_time_s, f"{BASELINE_LABEL} Run {i+1}")
@@ -385,7 +361,6 @@ class RobustDVFSComparator:
         return self._aligned_cache[column]
 
     def metric_statistics(self, column):
-        """Return cached time-weighted statistics for an aligned metric."""
         if column not in self._stats_cache:
             baseline_values, proposed_values = self.aligned_metric(column)
             self._stats_cache[column] = summarize_aligned_metric(
@@ -394,8 +369,6 @@ class RobustDVFSComparator:
         return self._stats_cache[column]
 
     def create_comprehensive_plots(self):
-        """Create the manuscript-style 3x2 runtime comparison figure (averaged traces)."""
-        # Modified to 3 rows x 2 columns (6 subplots total)
         fig, axes = plt.subplots(
             3, 2,
             figsize=(FULL_WIDTH_IN, 5.2),
@@ -408,7 +381,6 @@ class RobustDVFSComparator:
             hspace=0.34, wspace=0.40
         )
 
-        # Removed cpu_frequency and cpu_temperature
         metrics = [
             ('cpu_power', 'CPU power (W)'),
             ('ipc', 'IPC'),
@@ -450,7 +422,7 @@ class RobustDVFSComparator:
             ax.grid(True)
             add_panel_label(ax, f"({chr(ord('a') + index)})")
 
-            if row < 2:  # Suppress bottom x ticks for top 2 rows
+            if row < 2:
                 ax.tick_params(axis='x', which='both', labelbottom=False)
             else:
                 ax.set_xlabel('Time (min)', fontsize=BASE_FONT_SIZE, labelpad=2.0)
@@ -485,7 +457,6 @@ class RobustDVFSComparator:
         print(f"✅ Comprehensive plot saved:\n   JPEG: {jpeg_path}\n   PDF:  {pdf_path}")
 
     def create_box_plots(self):
-        """Create the journal-template 2x2 distribution comparison from averaged arrays."""
         requested = [
             ('cpu_power', 'CPU power (W)'),
             ('ipc', 'IPC'),
@@ -545,7 +516,6 @@ class RobustDVFSComparator:
         print(f"✅ Journal-style box plots saved:\n   JPEG: {jpeg_path}\n   PDF:  {pdf_path}")
 
     def create_performance_level_plots(self):
-        """Plot journal-style analysis-time share in each state concatenated across runs."""
         baseline_states = np.concatenate([
             align_categorical_state(b, self.analysis_time_s) for b in self.baselines
         ])
@@ -584,7 +554,6 @@ class RobustDVFSComparator:
 
     @staticmethod
     def _plot_distribution(ax, states, title, fallback_color, panel_label):
-        """Plot percentage of analysis time spent in each controller state."""
         counts = Counter(states.tolist())
         preferred_order = ['Low', 'Medium', 'High', 'Fixed']
         categories = sorted(
@@ -636,7 +605,6 @@ class RobustDVFSComparator:
         )
 
     def create_cache_performance_plot(self):
-        """Create the journal-template mean L2/L3 hit- and miss-rate summary."""
         from matplotlib.patches import Patch
 
         required = {'l2_miss_rate', 'l3_miss_rate'}
@@ -758,78 +726,177 @@ class RobustDVFSComparator:
         )
 
     def create_comparison_table(self):
-        """Generate detailed comparison table with multi-run averaged metrics."""
-        E_baseline = float(np.mean([compute_energy(b, 'cpu_power') for b in self.baselines]))
-        E_dvfs = float(np.mean([compute_energy(p, 'cpu_power') for p in self.proposeds]))
+        """Generate comprehensive comparison CSV including Task-to-Completion & Energy-Efficiency metrics."""
+        rows = []
 
-        metrics = [
-            ('Avg CPU Power (W)', self.metric_statistics('cpu_power')['baseline_mean'], self.metric_statistics('cpu_power')['proposed_mean'], 'lower'),
-            ('Avg IPC', self.metric_statistics('ipc')['baseline_mean'], self.metric_statistics('ipc')['proposed_mean'], 'higher'),
-            ('Avg CPU Usage (%)', self.metric_statistics('cpu_usage_overall')['baseline_mean'], self.metric_statistics('cpu_usage_overall')['proposed_mean'], 'lower'),
-            ('Avg L2 Miss Rate', self.metric_statistics('l2_miss_rate')['baseline_mean'], self.metric_statistics('l2_miss_rate')['proposed_mean'], 'lower'),
-            ('Avg L3 Miss Rate', self.metric_statistics('l3_miss_rate')['baseline_mean'], self.metric_statistics('l3_miss_rate')['proposed_mean'], 'lower'),
-            ('Total Energy (J)', E_baseline, E_dvfs, 'lower'),
+        # Standard Time-Weighted Telemetry Metrics
+        metric_specs = [
+            ("Average CPU power", "cpu_power", "W", 1.0, "lower"),
+            ("Average IPC", "ipc", "IPC", 1.0, "higher"),
+            ("Average CPU usage", "cpu_usage_overall", "%", 1.0, "lower"),
+            ("Average L2 miss rate", "l2_miss_rate", "ratio", 1.0, "lower"),
+            ("Average L3 miss rate", "l3_miss_rate", "ratio", 1.0, "lower"),
         ]
 
-        data = {
-            'Metric': [],
-            BASELINE_LABEL: [],
-            PROPOSED_LABEL: [],
-            'Improvement': [],
-            'Improvement %': []
-        }
+        for display_name, column, unit, scale, direction in metric_specs:
+            if column in self.baselines[0].columns and column in self.proposeds[0].columns:
+                stats = self.metric_statistics(column)
+                rows.append({
+                    "Metric": display_name,
+                    "Unit": unit,
+                    BASELINE_LABEL: stats['baseline_mean'] * scale,
+                    PROPOSED_LABEL: stats['proposed_mean'] * scale,
+                    "Baseline-referenced difference": stats['mean_delta'] * scale,
+                    "Change vs. baseline (%)": stats['percentage_change'],
+                })
 
-        for name, base_val, dvfs_val, direction in metrics:
-            imp = dvfs_val - base_val
-            imp_pct = (abs(imp) / base_val) * 100 if base_val != 0 else 0.0
-            sign = '+' if (imp < 0 and direction == 'lower') or (imp > 0 and direction == 'higher') else '-'
-            imp_str = f"{imp:+.3f}"
-            imp_pct_str = f"{sign}{imp_pct:.1f}%"
+        # Task-to-Completion & Energy Metrics
+        base_times = [float(b['elapsed_s'].iloc[-1]) for b in self.baselines]
+        prop_times = [float(p['elapsed_s'].iloc[-1]) for p in self.proposeds]
+        avg_base_time = float(np.mean(base_times))
+        avg_prop_time = float(np.mean(prop_times))
 
-            data['Metric'].append(name)
-            data[BASELINE_LABEL].append(f"{base_val:.3f}")
-            data[PROPOSED_LABEL].append(f"{dvfs_val:.3f}")
-            data['Improvement'].append(imp_str)
-            data['Improvement %'].append(imp_pct_str)
+        rows.append({
+            "Metric": "Task Execution Time",
+            "Unit": "s",
+            BASELINE_LABEL: avg_base_time,
+            PROPOSED_LABEL: avg_prop_time,
+            "Baseline-referenced difference": avg_base_time - avg_prop_time,
+            "Change vs. baseline (%)": 100.0 * (avg_prop_time - avg_base_time) / avg_base_time if avg_base_time else np.nan,
+        })
 
-        df_table = pd.DataFrame(data)
+        if "instructions_retired" in self.baselines[0].columns:
+            base_inst = [float(b['instructions_retired'].iloc[-1]) for b in self.baselines]
+            prop_inst = [float(p['instructions_retired'].iloc[-1]) for p in self.proposeds]
+            avg_base_inst = float(np.mean(base_inst))
+            avg_prop_inst = float(np.mean(prop_inst))
+
+            rows.append({
+                "Metric": "Total Instructions Retired",
+                "Unit": "count",
+                BASELINE_LABEL: avg_base_inst,
+                PROPOSED_LABEL: avg_prop_inst,
+                "Baseline-referenced difference": avg_base_inst - avg_prop_inst,
+                "Change vs. baseline (%)": 100.0 * (avg_prop_inst - avg_base_inst) / avg_base_inst if avg_base_inst else np.nan,
+            })
+
+        if "cpu_cycles" in self.baselines[0].columns:
+            base_cycles = [float(b['cpu_cycles'].iloc[-1]) for b in self.baselines]
+            prop_cycles = [float(p['cpu_cycles'].iloc[-1]) for p in self.proposeds]
+            avg_base_cycles = float(np.mean(base_cycles))
+            avg_prop_cycles = float(np.mean(prop_cycles))
+
+            rows.append({
+                "Metric": "Total CPU Cycles",
+                "Unit": "count",
+                BASELINE_LABEL: avg_base_cycles,
+                PROPOSED_LABEL: avg_prop_cycles,
+                "Baseline-referenced difference": avg_base_cycles - avg_prop_cycles,
+                "Change vs. baseline (%)": 100.0 * (avg_prop_cycles - avg_base_cycles) / avg_base_cycles if avg_base_cycles else np.nan,
+            })
+
+        if "memory_bandwidth" in self.baselines[0].columns:
+            base_gb = [trapezoid(b['memory_bandwidth'].to_numpy(), b['elapsed_s'].to_numpy()) / 1024.0 for b in self.baselines]
+            prop_gb = [trapezoid(p['memory_bandwidth'].to_numpy(), p['elapsed_s'].to_numpy()) / 1024.0 for p in self.proposeds]
+            avg_base_gb = float(np.mean(base_gb))
+            avg_prop_gb = float(np.mean(prop_gb))
+
+            rows.append({
+                "Metric": "Total Memory Data Transferred",
+                "Unit": "GB",
+                BASELINE_LABEL: avg_base_gb,
+                PROPOSED_LABEL: avg_prop_gb,
+                "Baseline-referenced difference": avg_base_gb - avg_prop_gb,
+                "Change vs. baseline (%)": 100.0 * (avg_prop_gb - avg_base_gb) / avg_base_gb if avg_base_gb else np.nan,
+            })
+
+        base_energies = [compute_energy(b, 'cpu_power') for b in self.baselines]
+        prop_energies = [compute_energy(p, 'cpu_power') for p in self.proposeds]
+        avg_base_energy = float(np.mean(base_energies))
+        avg_prop_energy = float(np.mean(prop_energies))
+
+        rows.append({
+            "Metric": "Integrated Total CPU Energy",
+            "Unit": "J",
+            BASELINE_LABEL: avg_base_energy,
+            PROPOSED_LABEL: avg_prop_energy,
+            "Baseline-referenced difference": avg_base_energy - avg_prop_energy,
+            "Change vs. baseline (%)": 100.0 * (avg_prop_energy - avg_base_energy) / avg_base_energy if avg_base_energy else np.nan,
+        })
+
+        if "instructions_retired" in self.baselines[0].columns:
+            base_ipj = avg_base_inst / avg_base_energy if avg_base_energy else np.nan
+            prop_ipj = avg_prop_inst / avg_prop_energy if avg_prop_energy else np.nan
+
+            rows.append({
+                "Metric": "Instructions per Joule (IPJ)",
+                "Unit": "Inst/J",
+                BASELINE_LABEL: base_ipj,
+                PROPOSED_LABEL: prop_ipj,
+                "Baseline-referenced difference": prop_ipj - base_ipj,
+                "Change vs. baseline (%)": 100.0 * (prop_ipj - base_ipj) / base_ipj if base_ipj else np.nan,
+            })
+
+        base_edp = avg_base_energy * avg_base_time
+        prop_edp = avg_prop_energy * avg_prop_time
+        rows.append({
+            "Metric": "Energy-Delay Product (EDP)",
+            "Unit": "J*s",
+            BASELINE_LABEL: base_edp,
+            PROPOSED_LABEL: prop_edp,
+            "Baseline-referenced difference": base_edp - prop_edp,
+            "Change vs. baseline (%)": 100.0 * (prop_edp - base_edp) / base_edp if base_edp else np.nan,
+        })
+
+        base_ed2p = base_edp * avg_base_time
+        prop_ed2p = prop_edp * avg_prop_time
+        rows.append({
+            "Metric": "Energy-Delay Squared (ED^2P)",
+            "Unit": "J*s^2",
+            BASELINE_LABEL: base_ed2p,
+            PROPOSED_LABEL: prop_ed2p,
+            "Baseline-referenced difference": base_ed2p - prop_ed2p,
+            "Change vs. baseline (%)": 100.0 * (prop_ed2p - base_ed2p) / base_ed2p if base_ed2p else np.nan,
+        })
+
+        df_table = pd.DataFrame(rows)
         ensure_results_dir()
         df_table.to_csv(OUTPUT_TABLE_CSV, index=False)
 
-        # Plot table
-        fig, ax = plt.subplots(figsize=(14, len(df_table)*0.9))
+        # Generate Visual Table Figure
+        fig, ax = plt.subplots(figsize=(14, len(df_table)*0.75))
         ax.axis('tight')
         ax.axis('off')
-        table = ax.table(cellText=df_table.values,
-                        colLabels=df_table.columns,
-                        cellLoc='center',
-                        loc='center')
+
+        formatted_cells = []
+        for _, row in df_table.iterrows():
+            formatted_cells.append([
+                row["Metric"],
+                row["Unit"],
+                f"{row[BASELINE_LABEL]:.3f}" if isinstance(row[BASELINE_LABEL], float) else str(row[BASELINE_LABEL]),
+                f"{row[PROPOSED_LABEL]:.3f}" if isinstance(row[PROPOSED_LABEL], float) else str(row[PROPOSED_LABEL]),
+                f"{row['Baseline-referenced difference']:+.3f}" if isinstance(row['Baseline-referenced difference'], float) else str(row['Baseline-referenced difference']),
+                f"{row['Change vs. baseline (%)']:+.1f}%" if isinstance(row['Change vs. baseline (%)'], float) else str(row['Change vs. baseline (%)']),
+            ])
+
+        col_labels = ["Metric", "Unit", BASELINE_LABEL, PROPOSED_LABEL, "Difference", "Change %"]
+        table = ax.table(cellText=formatted_cells, colLabels=col_labels, cellLoc='center', loc='center')
         table.auto_set_font_size(False)
         table.set_fontsize(AUX_TICK_SIZE)
-        table.scale(1.5, 2.5)
+        table.scale(1.3, 2.0)
 
-        for i in range(len(df_table)):
-            pct = df_table.iloc[i]['Improvement %']
-            is_positive = (pct.startswith('+') and float(pct.strip('%+')) > 0)
-            metric = df_table.iloc[i]['Metric']
-            if 'Energy' in metric and is_positive:
-                table[(i+1, 4)].set_facecolor('#90EE90')
-            elif not is_positive:
-                table[(i+1, 4)].set_facecolor('#FFB6C1')
-
-        plt.title('MLP-RPM Performance Comparison (Averaged)', fontsize=AUX_TITLE_SIZE, fontweight='bold', pad=10)
+        plt.title('MLP-RPM Performance & Efficiency Comparison', fontsize=AUX_TITLE_SIZE, fontweight='bold', pad=10)
         jpeg_path, pdf_path = save_figure_jpeg_pdf(fig, OUTPUT_TABLE_FIGURE)
         plt.show()
         plt.close(fig)
         print(
-            f"📋 Comparison table saved:\n"
+            f"📋 Detailed comparison table saved:\n"
             f"   CSV:  {OUTPUT_TABLE_CSV}\n"
             f"   JPEG: {jpeg_path}\n"
             f"   PDF:  {pdf_path}"
         )
 
     def generate_report(self):
-        """Generate a detailed text report with averaged workload-aware insight."""
         E_baseline = float(np.mean([compute_energy(b, 'cpu_power') for b in self.baselines]))
         E_dvfs = float(np.mean([compute_energy(p, 'cpu_power') for p in self.proposeds]))
         energy_savings = ((E_baseline - E_dvfs) / E_baseline) * 100 if E_baseline else 0.0
@@ -840,7 +907,8 @@ class RobustDVFSComparator:
         l3_stats = self.metric_statistics('l3_miss_rate')
         l3_miss_change = ((l3_stats['baseline_mean'] - l3_stats['proposed_mean']) / l3_stats['baseline_mean']) * 100 if l3_stats['baseline_mean'] else 0.0
 
-        avg_duration = float(np.mean([b['elapsed_s'].iloc[-1] for b in self.baselines]))
+        avg_base_time = float(np.mean([b['elapsed_s'].iloc[-1] for b in self.baselines]))
+        avg_prop_time = float(np.mean([p['elapsed_s'].iloc[-1] for p in self.proposeds]))
 
         report = f"""
 MLP-RPM Performance Analysis Report (Multi-Run Averaged)
@@ -848,7 +916,7 @@ MLP-RPM Performance Analysis Report (Multi-Run Averaged)
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 Workload: {self.workload_name}
 Type: {self.workload_type.upper()}
-Average Duration: {avg_duration:.1f} seconds
+Average Duration: {avg_base_time:.1f}s (Baseline), {avg_prop_time:.1f}s (MLP-RPM)
 Processed Runs: {len(self.baselines)} baseline runs, {len(self.proposeds)} MLP-RPM runs
 
 WORKLOAD CHARACTERIZATION
@@ -860,7 +928,7 @@ This is a {self.workload_type.replace('_', '-')} workload:
 
 EXECUTIVE SUMMARY
 -----------------
-- Energy Savings: {energy_savings:+.1f}% {'✅' if energy_savings > 0 else '❌'}
+- Integrated Energy Savings: {energy_savings:+.1f}% {'✅' if energy_savings > 0 else '❌'}
 - IPC Change: {ipc_change:+.1f}% {'✅' if ipc_change > 0 else '❌'}
 - L3 Miss Rate Reduction: {l3_miss_change:+.1f}% {'✅' if l3_miss_change > 0 else '❌'}
 
@@ -870,11 +938,13 @@ KEY METRICS (Averaged across runs)
   Avg Power:     {self.metric_statistics('cpu_power')['baseline_mean']:.2f} W
   Avg IPC:       {self.metric_statistics('ipc')['baseline_mean']:.3f}
   L3 Miss Rate:  {self.metric_statistics('l3_miss_rate')['baseline_mean']:.3f}
+  Total Energy:  {E_baseline:.1f} J
 
 {PROPOSED_LABEL}:
   Avg Power:     {self.metric_statistics('cpu_power')['proposed_mean']:.2f} W
   Avg IPC:       {self.metric_statistics('ipc')['proposed_mean']:.3f}
   L3 Miss Rate:  {self.metric_statistics('l3_miss_rate')['proposed_mean']:.3f}
+  Total Energy:  {E_dvfs:.1f} J
 
 MLP-RPM Level Distribution (Concatenated):
 """
@@ -886,25 +956,6 @@ MLP-RPM Level Distribution (Concatenated):
         for level, count in state_counts.items():
             report += f"  {level}: {count} samples ({(count/total_samples)*100:.1f}%)\n"
 
-        report += f"""
-CONCLUSION
-----------
-"""
-        if self.workload_type == "memory_intensive":
-            if energy_savings > 5 and abs(ipc_change) < 3:
-                report += "✅ The MLP-RPM controller is effective: it reduces energy significantly with negligible performance loss — ideal for memory-bound apps."
-            elif energy_savings > 0 and ipc_change > -5:
-                report += "🟡 The MLP-RPM controller saves energy with acceptable IPC trade-off."
-            else:
-                report += "❌ The MLP-RPM controller is too aggressive — it boosts frequency unnecessarily, wasting power without improving performance."
-        else:
-            if energy_savings > 5 and ipc_change > -2:
-                report += "✅ The MLP-RPM controller is highly effective: significant energy savings with minimal performance impact."
-            elif energy_savings > 0 and ipc_change > -5:
-                report += "🟡 The MLP-RPM controller reduces energy with acceptable performance trade-off."
-            else:
-                report += "❌ The MLP-RPM controller does not provide clear benefits under this workload."
-
         ensure_results_dir()
         with open(OUTPUT_REPORT, 'w', encoding='utf-8') as f:
             f.write(report)
@@ -913,7 +964,7 @@ CONCLUSION
 
 
 def main():
-    print("🚀 Starting MLP-RPM Comparison Analysis (Multi-Run Average)")
+    print("🚀 Starting MLP-RPM Comparison Analysis (Multi-Run Average & Work-Normalized)")
     print("=" * 60)
 
     try:

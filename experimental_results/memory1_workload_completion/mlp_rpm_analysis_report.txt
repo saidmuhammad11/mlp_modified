@@ -1,0 +1,38 @@
+
+MLP-RPM Performance Analysis Report (Multi-Run Averaged)
+=========================================================
+Generated: 2026-10-15 10:58:39
+Workload: memory_intensive
+Type: MEMORY_INTENSIVE
+Average Duration: 119.6s (Baseline), 119.6s (MLP-RPM)
+Processed Runs: 5 baseline runs, 5 MLP-RPM runs
+
+WORKLOAD CHARACTERIZATION
+-------------------------
+This is a memory-intensive workload:
+- High L3 miss rate and memory bandwidth → CPU stalls on memory
+- Frequency scaling has limited impact on IPC
+- Ideal strategy: Moderate frequency to save energy without hurting performance
+
+EXECUTIVE SUMMARY
+-----------------
+- Integrated Energy Savings: +1.5% ✅
+- IPC Change: +0.6% ✅
+- L3 Miss Rate Reduction: -0.7% ❌
+
+KEY METRICS (Averaged across runs)
+----------------------------------
+Default Windows Medium:
+  Avg Power:     9.89 W
+  Avg IPC:       0.715
+  L3 Miss Rate:  0.392
+  Total Energy:  1184.2 J
+
+MLP-RPM:
+  Avg Power:     9.74 W
+  Avg IPC:       0.719
+  L3 Miss Rate:  0.395
+  Total Energy:  1166.9 J
+
+MLP-RPM Level Distribution (Concatenated):
+  Low: 610 samples (100.0%)
